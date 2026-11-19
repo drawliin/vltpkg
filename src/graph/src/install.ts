@@ -227,12 +227,17 @@ export async function install(
           continue
         const edge = importer.edgesOut.get(depName)
         if (edge?.spec) {
+          const node = lockfileGraph.nodes.get(importer.id)
+          /* c8 ignore next */
+          const location = node?.location || importer.id
           if (edge.spec.toString() !== dep.spec.toString()) {
-            const node = lockfileGraph.nodes.get(importer.id)
-            /* c8 ignore next */
-            const location = node?.location || importer.id
             specChanges.push(
               `  ${location}: ${depName} spec changed from "${edge.spec}" to "${dep.spec}"`,
+            )
+          }
+          if (edge.type !== dep.type) {
+            specChanges.push(
+              `  ${location}: ${depName} type changed from "${edge.type}" to "${dep.type}"`,
             )
           }
         }

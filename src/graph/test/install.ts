@@ -4470,6 +4470,48 @@ const ungovernedFrozenCase = async (
   )
 }
 
+t.test('the frozen check sees a moved dependency', async t => {
+  const projectRoot = t.testdir({
+    'package.json': JSON.stringify({
+      name: 'my-project',
+      version: '1.0.0',
+      dependencies: { abbrev: '2.0.0' },
+    }),
+    'vlt.json': '{}',
+  })
+  t.chdir(projectRoot)
+  unload('project')
+  const opts = (extra?: Record<string, unknown>) =>
+    ({
+      projectRoot,
+      scurry: new PathScurry(projectRoot),
+      packageJson: new PackageJson(),
+      packageInfo: mockPackageInfo,
+      allowScripts: ':not(*)',
+      registries: { npm: 'https://registry.npmjs.org/' },
+      ...extra,
+    }) as unknown as InstallOptions
+  const { install } = await import('../src/install.ts')
+  await install(opts())
+  const lockfile = resolve(projectRoot, 'vlt-lock.json')
+  const locked = readFileSync(lockfile, 'utf8')
+
+  writeFileSync(
+    resolve(projectRoot, 'package.json'),
+    JSON.stringify({
+      name: 'my-project',
+      version: '1.0.0',
+      devDependencies: { abbrev: '2.0.0' },
+    }),
+  )
+  await t.rejects(
+    install(opts({ frozenLockfile: true })),
+    /abbrev type changed from "prod" to "dev"/,
+    'same spec, another dependency type',
+  )
+  t.equal(readFileSync(lockfile, 'utf8'), locked, 'lockfile kept')
+})
+
 t.test('a modifier scoped deeper does not exempt the root edge', t =>
   ungovernedFrozenCase(t, { ':root > #unused > #abbrev': '2.0.0' }),
 )
